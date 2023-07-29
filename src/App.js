@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { GoogleMap, Marker, useJsApiLoader, DirectionsService, DirectionsRenderer } from '@react-google-maps/api';
 
 const mapContainerStyle = {
   width: '100%',
@@ -7,8 +7,32 @@ const mapContainerStyle = {
 };
 
 const initialCenter = {
-  lat: 4.570868, // Latitud de Colombia
-  lng: -74.297332, // Longitud de Colombia
+  lat: 10.391048, // Latitud del centro de Cartagena
+  lng: -75.479426, // Longitud del centro de Cartagena
+};
+
+// Función para calcular la distancia en metros entre dos coordenadas
+function calculateDistance(coord1, coord2) {
+  const radianFactor = Math.PI / 180;
+  const earthRadius = 6371000; // Radio de la Tierra en metros
+
+  const lat1 = coord1.lat * radianFactor;
+  const lng1 = coord1.lng * radianFactor;
+  const lat2 = coord2.lat * radianFactor;
+  const lng2 = coord2.lng * radianFactor;
+
+  const dLat = lat2 - lat1;
+  const dLng = lng2 - lng1;
+
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadius * c;
+}
+
+const RouteRenderer = ({ directions }) => {
+  return <DirectionsRenderer directions={directions} options={{ suppressMarkers: true }} />;
 };
 
 const App = () => {
@@ -16,47 +40,95 @@ const App = () => {
     googleMapsApiKey: 'AIzaSyAV4D2bdwymi7NH4aFixK92wJ8y8_ndqbg', // Reemplaza esto con tu propia API Key de Google Maps
   });
 
-  const [map, setMap] = useState(null);
   const [userPosition, setUserPosition] = useState(null);
+  const [directions, setDirections] = useState(null);
+
+  const mapRef = useRef(null);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      const updateInterval = setInterval(() => {
+    let updateInterval;
+
+    const updatePosition = () => {
+      if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            setUserPosition({
+            const newPosition = {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
-            });
+            };
+
+            // Comprobamos si userPosition es null antes de llamar a la función calculateDistance
+            if (userPosition && calculateDistance(userPosition, newPosition) > 1) {
+              setUserPosition(newPosition);
+
+              // Si tenemos una referencia al mapa, centrar el mapa en la nueva ubicación del usuario
+              if (mapRef.current) {
+                mapRef.current.panTo(newPosition);
+              }
+            }
           },
           (error) => {
             console.error('Error obteniendo la ubicación:', error.message);
           }
         );
-      }, 5000); // Actualizar cada 5 segundos, ajusta el valor según tus necesidades
+      } else {
+        console.error('La geolocalización no es compatible con este navegador.');
+      }
+    };
 
-      return () => clearInterval(updateInterval);
-    } else {
-      console.error('La geolocalización no es compatible con este navegador.');
-    }
-  }, []);
+    updateInterval = setInterval(updatePosition, 5000); // Actualizar cada 5 segundos, ajusta el valor según tus necesidades
+
+    // Limpiamos el intervalo cuando el componente se desmonta para detener el seguimiento de la ubicación
+    return () => clearInterval(updateInterval);
+  }, [userPosition]);
 
   const handleMapLoad = (map) => {
-    setMap(map);
+    mapRef.current = map;
   };
 
-  // Lógica para establecer el centro del mapa y el nivel de zoom
-  const centerMap = userPosition || initialCenter;
-  const zoomLevel = userPosition ? 15 : 6; // Ajusta el nivel de zoom para mostrar más cerca el marcador si hay ubicación del usuario
+  const mapOptions = {
+    styles: [
+      {
+        featureType: 'poi',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'transit',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+    ],
+  };
 
   return isLoaded ? (
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
-      center={centerMap}
-      zoom={zoomLevel}
+      center={initialCenter}
+      zoom={15}
       onLoad={handleMapLoad}
+      clickableIcons={false} // Deshabilita la interacción con los íconos de Google Maps
+      options={mapOptions} // Configura las opciones del mapa para mostrar solo el nombre de las calles
     >
       {userPosition && <Marker position={userPosition} label="You are here" />}
+      <Marker position={initialCenter} label="Point B" />
+
+      {userPosition && (
+        <DirectionsService
+          options={{
+            destination: initialCenter,
+            origin: userPosition,
+            travelMode: 'DRIVING',
+          }}
+          callback={(result) => {
+            if (result !== null) {
+              setDirections(result);
+            }
+          }}
+        />
+      )}
+
+      {directions && <RouteRenderer directions={directions} />}
     </GoogleMap>
   ) : (
     <div>Cargando mapa...</div>
