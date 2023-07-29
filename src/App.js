@@ -31,9 +31,11 @@ function calculateDistance(coord1, coord2) {
   return earthRadius * c;
 }
 
+
 const RouteRenderer = ({ directions }) => {
   return <DirectionsRenderer directions={directions} options={{ suppressMarkers: true }} />;
 };
+
 
 const App = () => {
   const { isLoaded } = useJsApiLoader({
@@ -58,7 +60,7 @@ const App = () => {
             };
 
             // Comprobamos si userPosition es null antes de llamar a la función calculateDistance
-            if (userPosition && calculateDistance(userPosition, newPosition) > 1) {
+            if (!userPosition || calculateDistance(userPosition, newPosition) > 1) {
               setUserPosition(newPosition);
 
               // Si tenemos una referencia al mapa, centrar el mapa en la nueva ubicación del usuario
@@ -86,29 +88,13 @@ const App = () => {
     mapRef.current = map;
   };
 
-  const mapOptions = {
-    styles: [
-      {
-        featureType: 'poi',
-        elementType: 'labels',
-        stylers: [{ visibility: 'off' }],
-      },
-      {
-        featureType: 'transit',
-        elementType: 'labels',
-        stylers: [{ visibility: 'off' }],
-      },
-    ],
-  };
-
   return isLoaded ? (
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
       center={initialCenter}
-      zoom={15}
+      zoom={6}
       onLoad={handleMapLoad}
       clickableIcons={false} // Deshabilita la interacción con los íconos de Google Maps
-      options={mapOptions} // Configura las opciones del mapa para mostrar solo el nombre de las calles
     >
       {userPosition && <Marker position={userPosition} label="You are here" />}
       <Marker position={initialCenter} label="Point B" />
