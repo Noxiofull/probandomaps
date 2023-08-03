@@ -1,0 +1,23 @@
+/* Estilos generales para los botones de Google */
+.google-button {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 4px;
+    background-color: #4285f4; /* Color azul de Google */
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .google-button:hover {
+    background-color: #357ae8; /* Color azul oscuro al pasar el mouse */
+  }
+  
+  /* Estilos específicos para el icono de Google */
+  .google-icon {
+    font-size: 18px;
+    margin-right: 8px;
+  }

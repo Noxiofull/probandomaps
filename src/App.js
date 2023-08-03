@@ -1,123 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { GoogleMap, Marker, useJsApiLoader, DirectionsService, DirectionsRenderer } from '@react-google-maps/api';
-
-const mapContainerStyle = {
-  width: '100%',
-  height: '500px',
-};
-
-const initialCenter = {
-  lat: 10.391048, // Latitud del centro de Cartagena
-  lng: -75.479426, // Longitud del centro de Cartagena
-};
-
-// Función para calcular la distancia en metros entre dos coordenadas
-function calculateDistance(coord1, coord2) {
-  const radianFactor = Math.PI / 180;
-  const earthRadius = 6371000; // Radio de la Tierra en metros
-
-  const lat1 = coord1.lat * radianFactor;
-  const lng1 = coord1.lng * radianFactor;
-  const lat2 = coord2.lat * radianFactor;
-  const lng2 = coord2.lng * radianFactor;
-
-  const dLat = lat2 - lat1;
-  const dLng = lng2 - lng1;
-
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return earthRadius * c;
-}
-
-
-const RouteRenderer = ({ directions }) => {
-  return <DirectionsRenderer directions={directions} options={{ suppressMarkers: true }} />;
-};
-
+import React, { useState, useEffect } from 'react';
+import firebase from 'firebase/compat/app';
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import GoogleSignInButton from './componentes/GoogleSignInButton';
+import GoogleMapComponent from './GoogleMapComponent';
 
 const App = () => {
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: 'AIzaSyAV4D2bdwymi7NH4aFixK92wJ8y8_ndqbg', // Reemplaza esto con tu propia API Key de Google Maps
-  });
+  const [user, setUser] = useState(null);
 
-  const [userPosition, setUserPosition] = useState(null);
-  const [directions, setDirections] = useState(null);
-
-  const mapRef = useRef(null);
+  // Obtener el objeto de autenticación de Firebase
+  const auth = getAuth();
 
   useEffect(() => {
-    let updateInterval;
+    // Escuchar cambios en el estado de autenticación
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
 
-    const updatePosition = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const newPosition = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
+    // Limpiar el suscriptor cuando el componente se desmonte
+    return () => unsubscribe();
+  }, [auth]);
 
-            // Comprobamos si userPosition es null antes de llamar a la función calculateDistance
-            if (!userPosition || calculateDistance(userPosition, newPosition) > 1) {
-              setUserPosition(newPosition);
+  console.log(user);
 
-              // Si tenemos una referencia al mapa, centrar el mapa en la nueva ubicación del usuario
-              if (mapRef.current) {
-                mapRef.current.panTo(newPosition);
-              }
-            }
-          },
-          (error) => {
-            console.error('Error obteniendo la ubicación:', error.message);
-          }
-        );
-      } else {
-        console.error('La geolocalización no es compatible con este navegador.');
-      }
-    };
+  return (
+    <>
+        <div>
+      {!user ? <GoogleSignInButton /> : <GoogleMapComponent />}
+    </div>
+    </>
 
-    updateInterval = setInterval(updatePosition, 5000); // Actualizar cada 5 segundos, ajusta el valor según tus necesidades
-
-    // Limpiamos el intervalo cuando el componente se desmonta para detener el seguimiento de la ubicación
-    return () => clearInterval(updateInterval);
-  }, [userPosition]);
-
-  const handleMapLoad = (map) => {
-    mapRef.current = map;
-  };
-
-  return isLoaded ? (
-    <GoogleMap
-      mapContainerStyle={mapContainerStyle}
-      center={initialCenter}
-      zoom={6}
-      onLoad={handleMapLoad}
-      clickableIcons={false} // Deshabilita la interacción con los íconos de Google Maps
-    >
-      {userPosition && <Marker position={userPosition} label="You are here" />}
-      <Marker position={initialCenter} label="Point B" />
-
-      {userPosition && (
-        <DirectionsService
-          options={{
-            destination: initialCenter,
-            origin: userPosition,
-            travelMode: 'DRIVING',
-          }}
-          callback={(result) => {
-            if (result !== null) {
-              setDirections(result);
-            }
-          }}
-        />
-      )}
-
-      {directions && <RouteRenderer directions={directions} />}
-    </GoogleMap>
-  ) : (
-    <div>Cargando mapa...</div>
   );
 };
 
